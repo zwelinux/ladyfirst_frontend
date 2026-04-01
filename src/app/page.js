@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { clearAuthSession, useAuthSession } from "@/lib/auth";
-import { apiFetch, getApiBaseUrl } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 const primaryActions = [
   {
@@ -178,7 +178,6 @@ function AccentCard({ name, href, summary, metric, tone }) {
 export default function Home() {
   const router = useRouter();
   const { token, user, ready } = useAuthSession();
-  const apiBase = getApiBaseUrl();
 
   useEffect(() => {
     if (ready && !token) {
@@ -227,30 +226,15 @@ export default function Home() {
               </div>
 
               <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
-                Premium operations console for catalog, payments, and logistics.
+                DASHBOARD
               </h1>
 
               <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
-                Keep product uploads, orders, payment reviews, wallets, and Send To Us workflows inside one focused control surface.
+                Manage everything under control.
               </p>
-
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Link
-                  href="/products/upload"
-                  className="inline-flex items-center justify-center rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-400"
-                >
-                  Upload Product
-                </Link>
-                <Link
-                  href="/orders"
-                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
-                >
-                  Open Orders
-                </Link>
-              </div>
             </div>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col justify-between gap-4">
               <div className="rounded-[28px] border border-white/10 bg-white/6 p-5 backdrop-blur-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                   Session
@@ -269,29 +253,6 @@ export default function Home() {
                       .slice(0, 2)
                       .toUpperCase()}
                   </div>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[28px] border border-white/10 bg-white/6 p-5 backdrop-blur-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                    Surface
-                  </p>
-                  <p className="mt-3 text-3xl font-semibold text-white">14</p>
-                  <p className="mt-2 text-sm text-slate-300">
-                    Admin destinations connected
-                  </p>
-                </div>
-                <div className="rounded-[28px] border border-white/10 bg-white/6 p-5 backdrop-blur-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                    API Target
-                  </p>
-                  <p className="mt-3 line-clamp-2 text-sm font-medium text-white">
-                    {apiBase}
-                  </p>
-                  <p className="mt-2 text-sm text-slate-300">
-                    Current admin data source
-                  </p>
                 </div>
               </div>
 
