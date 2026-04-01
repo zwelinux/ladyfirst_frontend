@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useAuthSession } from "@/lib/auth";
 
 const API_BASE_URL =
@@ -12,7 +12,7 @@ function buildApiUrl(path) {
   return `${API_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
 }
 
-export default function WalletTransactionsPage() {
+function WalletTransactionsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { token, user } = useAuthSession();
@@ -213,5 +213,21 @@ export default function WalletTransactionsPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function WalletTransactionsPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-5 py-8">
+          <div className="mx-auto max-w-4xl rounded-[28px] border border-white/70 bg-white/80 px-6 py-5 text-sm text-slate-600 shadow-[0_20px_60px_rgba(148,163,184,0.16)]">
+            Loading wallet transactions...
+          </div>
+        </main>
+      }
+    >
+      <WalletTransactionsPageContent />
+    </Suspense>
   );
 }
