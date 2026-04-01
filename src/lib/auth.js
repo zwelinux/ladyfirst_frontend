@@ -57,13 +57,11 @@ export function getRefreshToken() {
 }
 
 function readAuthSession() {
-  const user = getStoredUser();
   const access = getAccessToken();
-  const token =
-    access || (!isLocalDevHost() && user ? "cookie-session" : "");
+  const user = access ? getStoredUser() : null;
 
   return {
-    token,
+    token: access,
     user,
     ready: true,
   };
