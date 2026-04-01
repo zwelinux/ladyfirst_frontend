@@ -5,13 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuthSession } from "@/lib/auth";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/auth";
-
-function buildApiUrl(path) {
-  return `${API_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
-}
+import { apiFetch } from "@/lib/api";
 
 async function readApiResponse(response) {
   const text = await response.text();
@@ -25,15 +19,15 @@ async function readApiResponse(response) {
 export default function SendToUsSessionDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { token } = useAuthSession();
+  const { token, ready } = useAuthSession();
   const [session, setSession] = useState(null);
   const [previewPhoto, setPreviewPhoto] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!token) router.replace("/login");
-  }, [router, token]);
+    if (ready && !token) router.replace("/login");
+  }, [ready, router, token]);
 
   useEffect(() => {
     if (!token || !params?.id) return;
@@ -43,9 +37,8 @@ export default function SendToUsSessionDetailPage() {
       setLoading(true);
       setError("");
       try {
-        const response = await fetch(buildApiUrl(`/admin/sendus/sessions/${params.id}/`), {
+        const response = await apiFetch(`/admin/sendus/sessions/${params.id}/`, {
           headers: {
-            Authorization: `Bearer ${token}`,
             Accept: "application/json",
           },
         });
@@ -69,9 +62,9 @@ export default function SendToUsSessionDetailPage() {
     return () => {
       active = false;
     };
-  }, [params, token]);
+  }, [params, ready, token]);
 
-  if (!token) {
+  if (!ready || !token) {
     return <main className="min-h-screen bg-[linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-5 py-8"><div className="mx-auto max-w-4xl rounded-[28px] border border-white/70 bg-white/80 px-6 py-5 text-sm text-slate-600 shadow-[0_20px_60px_rgba(148,163,184,0.16)]">Checking session...</div></main>;
   }
 

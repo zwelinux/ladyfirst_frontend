@@ -4,30 +4,24 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuthSession } from "@/lib/auth";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/auth";
-
-function buildApiUrl(path) {
-  return `${API_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
-}
+import { apiFetch } from "@/lib/api";
 
 export default function UsersPage() {
   const router = useRouter();
-  const { token, user } = useAuthSession();
+  const { token, user, ready } = useAuthSession();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    if (!token) {
+    if (ready && !token) {
       router.replace("/login");
     }
-  }, [router, token]);
+  }, [ready, router, token]);
 
   useEffect(() => {
-    if (!token) {
+    if (!ready || !token) {
       return;
     }
 
@@ -38,11 +32,7 @@ export default function UsersPage() {
       setError("");
 
       try {
-        const response = await fetch(buildApiUrl("/users/"), {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await apiFetch("/users/");
         const data = await response.json();
 
         if (!response.ok) {
@@ -68,7 +58,7 @@ export default function UsersPage() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [ready, token]);
 
   const filteredUsers = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -89,7 +79,7 @@ export default function UsersPage() {
     );
   }, [search, users]);
 
-  if (!token) {
+  if (!ready || !token) {
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-5 py-8">
         <div className="mx-auto max-w-4xl rounded-[28px] border border-white/70 bg-white/80 px-6 py-5 text-sm text-slate-600 shadow-[0_20px_60px_rgba(148,163,184,0.16)]">

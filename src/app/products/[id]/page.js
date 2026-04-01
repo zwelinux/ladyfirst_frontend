@@ -5,9 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuthSession } from "@/lib/auth";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/auth";
+import { apiFetch } from "@/lib/api";
 
 const measurementConfig = [
   { key: "width_cm", label: "Width" },
@@ -43,9 +41,6 @@ const defaultMeasurements = measurementConfig.reduce((acc, item) => {
   return acc;
 }, {});
 
-function buildApiUrl(path) {
-  return `${API_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
-}
 
 function SectionTitle({ title }) {
   return <h2 className="text-2xl font-semibold text-slate-950">{title}</h2>;
@@ -105,7 +100,7 @@ function SelectField({ label, name, value, onChange, options }) {
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { token, user: currentUser } = useAuthSession();
+  const { token, user: currentUser, ready } = useAuthSession();
   const productId = params?.id;
 
   const [loading, setLoading] = useState(true);
@@ -127,10 +122,10 @@ export default function ProductDetailPage() {
   });
 
   useEffect(() => {
-    if (!token) {
+    if (ready && !token) {
       router.replace("/login");
     }
-  }, [router, token]);
+  }, [ready, router, token]);
 
   useEffect(() => {
     if (!token || !productId) {
@@ -152,14 +147,12 @@ export default function ProductDetailPage() {
           colorsResponse,
           conditionsResponse,
         ] = await Promise.all([
-          fetch(buildApiUrl(`/products/${productId}/`), {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(buildApiUrl("/categories/")),
-          fetch(buildApiUrl("/tags/")),
-          fetch(buildApiUrl("/sizes/")),
-          fetch(buildApiUrl("/colors/")),
-          fetch(buildApiUrl("/conditions/")),
+          apiFetch(`/products/${productId}/`),
+          apiFetch("/categories/"),
+          apiFetch("/tags/"),
+          apiFetch("/sizes/"),
+          apiFetch("/colors/"),
+          apiFetch("/conditions/"),
         ]);
 
         const productData = await productResponse.json();
@@ -332,10 +325,9 @@ export default function ProductDetailPage() {
         payload.append("uploaded_images", image);
       });
 
-      const response = await fetch(buildApiUrl(`/products/${productId}/`), {
+      const response = await apiFetch(`/products/${productId}/`, {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer ${token}`,
         },
         body: payload,
       });
@@ -357,7 +349,7 @@ export default function ProductDetailPage() {
     }
   }
 
-  if (!token) {
+  if (!ready || !token) {
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-5 py-8">
         <div className="mx-auto max-w-4xl rounded-[28px] border border-white/70 bg-white/80 px-6 py-5 text-sm text-slate-600 shadow-[0_20px_60px_rgba(148,163,184,0.16)]">

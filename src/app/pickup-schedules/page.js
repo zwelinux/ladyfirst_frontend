@@ -4,13 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuthSession } from "@/lib/auth";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/auth";
-
-function buildApiUrl(path) {
-  return `${API_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
-}
+import { apiFetch } from "@/lib/api";
 
 async function readApiResponse(response) {
   const text = await response.text();
@@ -31,20 +25,20 @@ function formatDate(value) {
 
 export default function PickupSchedulesPage() {
   const router = useRouter();
-  const { token, user } = useAuthSession();
+  const { token, user, ready } = useAuthSession();
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    if (!token) {
+    if (ready && !token) {
       router.replace("/login");
     }
-  }, [router, token]);
+  }, [ready, router, token]);
 
   useEffect(() => {
-    if (!token) {
+    if (!ready || !token) {
       return;
     }
 
@@ -55,10 +49,9 @@ export default function PickupSchedulesPage() {
       setError("");
 
       try {
-        const response = await fetch(buildApiUrl("/admin/pickup-schedules/"), {
+        const response = await apiFetch("/admin/pickup-schedules/", {
           headers: {
             Accept: "application/json",
-            Authorization: `Bearer ${token}`,
           },
         });
         const data = await readApiResponse(response);
@@ -90,7 +83,7 @@ export default function PickupSchedulesPage() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [ready, token]);
 
   const filteredSchedules = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -112,7 +105,7 @@ export default function PickupSchedulesPage() {
     );
   }, [schedules, search]);
 
-  if (!token) {
+  if (!ready || !token) {
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-5 py-8">
         <div className="mx-auto max-w-4xl rounded-[28px] border border-white/70 bg-white/80 px-6 py-5 text-sm text-slate-600 shadow-[0_20px_60px_rgba(148,163,184,0.16)]">

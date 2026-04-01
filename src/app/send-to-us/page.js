@@ -7,15 +7,15 @@ import { useAuthSession } from "@/lib/auth";
 
 export default function SendToUsHubPage() {
   const router = useRouter();
-  const { token, user } = useAuthSession();
+  const { token, user, ready } = useAuthSession();
 
   useEffect(() => {
-    if (!token) {
+    if (ready && !token) {
       router.replace("/login");
     }
-  }, [router, token]);
+  }, [ready, router, token]);
 
-  if (!token) {
+  if (!ready || !token) {
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-5 py-8">
         <div className="mx-auto max-w-4xl rounded-[28px] border border-white/70 bg-white/80 px-6 py-5 text-sm text-slate-600 shadow-[0_20px_60px_rgba(148,163,184,0.16)]">

@@ -4,9 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuthSession } from "@/lib/auth";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/auth";
+import { apiFetch, getApiBaseUrl } from "@/lib/api";
 
 const measurementConfig = [
   { key: "width_cm", label: "Width" },
@@ -120,13 +118,10 @@ function SelectField({
   );
 }
 
-function buildApiUrl(path) {
-  return `${API_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
-}
 
 export default function ProductUploadPage() {
   const router = useRouter();
-  const { token, user: currentUser } = useAuthSession();
+  const { token, user: currentUser, ready } = useAuthSession();
   const [form, setForm] = useState(defaultForm);
   const [measurements, setMeasurements] = useState(defaultMeasurements);
   const [images, setImages] = useState([]);
@@ -145,13 +140,13 @@ export default function ProductUploadPage() {
   });
 
   useEffect(() => {
-    if (!token) {
+    if (ready && !token) {
       router.replace("/login");
     }
-  }, [router, token]);
+  }, [ready, router, token]);
 
   useEffect(() => {
-    if (!token) {
+    if (!ready || !token) {
       return;
     }
 
@@ -170,12 +165,12 @@ export default function ProductUploadPage() {
           colorsResponse,
           conditionsResponse,
         ] = await Promise.all([
-          fetch(buildApiUrl("/users/")),
-          fetch(buildApiUrl("/categories/")),
-          fetch(buildApiUrl("/tags/")),
-          fetch(buildApiUrl("/sizes/")),
-          fetch(buildApiUrl("/colors/")),
-          fetch(buildApiUrl("/conditions/")),
+          apiFetch("/users/"),
+          apiFetch("/categories/"),
+          apiFetch("/tags/"),
+          apiFetch("/sizes/"),
+          apiFetch("/colors/"),
+          apiFetch("/conditions/"),
         ]);
 
         if (
@@ -242,7 +237,7 @@ export default function ProductUploadPage() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [ready, token]);
 
   const sellerOptions = useMemo(
     () =>
@@ -354,7 +349,7 @@ export default function ProductUploadPage() {
     setError("");
 
     try {
-      if (!token) {
+      if (!ready || !token) {
         throw new Error("JWT access token is required to call the upload endpoint.");
       }
 
@@ -392,10 +387,9 @@ export default function ProductUploadPage() {
         payload.append("uploaded_images", image);
       });
 
-      const response = await fetch(buildApiUrl("/products/upload/"), {
+      const response = await apiFetch("/products/upload/", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
         },
         body: payload,
       });
@@ -797,7 +791,7 @@ export default function ProductUploadPage() {
                 Backend Mapping
               </p>
               <div className="mt-6 space-y-3 text-sm text-slate-300">
-                <p>API base: `{API_BASE_URL}`</p>
+                <p>API base: `{getApiBaseUrl()}`</p>
                 <p>Seller dropdown maps to `seller_id` for staff uploads.</p>
                 <p>Tags map to repeated `tag_names` fields.</p>
                 <p>Images map to repeated `uploaded_images` files.</p>

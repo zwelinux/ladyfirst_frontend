@@ -2,27 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAccessToken, setAuthSession } from "@/lib/auth";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/auth";
-
-function buildApiUrl(path) {
-  return `${API_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
-}
+import { setAuthSession, useAuthSession } from "@/lib/auth";
+import { apiFetch } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { token, ready } = useAuthSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (getAccessToken()) {
+    if (ready && token) {
       router.replace("/");
     }
-  }, [router]);
+  }, [ready, router, token]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -30,7 +25,7 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const response = await fetch(buildApiUrl("/login/"), {
+      const response = await apiFetch("/login/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -59,6 +54,18 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!ready || token) {
+    return (
+      <main className="min-h-screen bg-[linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-5 py-8">
+        <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center justify-center">
+          <div className="w-full max-w-4xl rounded-[32px] border border-white/70 bg-white px-8 py-10 text-sm text-slate-600 shadow-[0_20px_70px_rgba(148,163,184,0.2)]">
+            Checking session...
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (

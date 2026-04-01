@@ -4,9 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useAuthSession } from "@/lib/auth";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/auth";
+import { apiFetch } from "@/lib/api";
 
 const statusOptions = [
   { value: "", label: "All Statuses" },
@@ -17,14 +15,11 @@ const statusOptions = [
   { value: "bidding", label: "Bidding" },
 ];
 
-function buildApiUrl(path) {
-  return `${API_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
-}
 
 function ProductsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { token, user: currentUser } = useAuthSession();
+  const { token, user: currentUser, ready } = useAuthSession();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [products, setProducts] = useState([]);
@@ -42,13 +37,13 @@ function ProductsPageContent() {
   const page = Number(searchParams.get("page") || "1");
 
   useEffect(() => {
-    if (!token) {
+    if (ready && !token) {
       router.replace("/login");
     }
-  }, [router, token]);
+  }, [ready, router, token]);
 
   useEffect(() => {
-    if (!token) {
+    if (!ready || !token) {
       return;
     }
 
@@ -71,11 +66,7 @@ function ProductsPageContent() {
           query.set("status", filters.status);
         }
 
-        const response = await fetch(buildApiUrl(`/products/?${query.toString()}`), {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await apiFetch(`/products/?${query.toString()}`);
         const data = await response.json();
 
         if (!response.ok) {
@@ -109,7 +100,7 @@ function ProductsPageContent() {
     return () => {
       active = false;
     };
-  }, [filters.keyword, filters.status, page, token]);
+  }, [filters.keyword, filters.status, page, ready, token]);
 
   function applyFilters(event) {
     event.preventDefault();
@@ -133,7 +124,7 @@ function ProductsPageContent() {
     router.push(`/products?${query.toString()}`);
   }
 
-  if (!token) {
+  if (!ready || !token) {
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-5 py-8">
         <div className="mx-auto max-w-4xl rounded-[28px] border border-white/70 bg-white/80 px-6 py-5 text-sm text-slate-600 shadow-[0_20px_60px_rgba(148,163,184,0.16)]">

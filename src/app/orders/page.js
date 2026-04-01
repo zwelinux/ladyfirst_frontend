@@ -4,9 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuthSession } from "@/lib/auth";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/auth";
+import { apiFetch } from "@/lib/api";
 
 const statusOptions = [
   { value: "", label: "All Statuses" },
@@ -19,9 +17,6 @@ const statusOptions = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
-function buildApiUrl(path) {
-  return `${API_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
-}
 
 async function readApiResponse(response) {
   const text = await response.text();
@@ -42,7 +37,7 @@ function formatDate(value) {
 
 export default function OrdersPage() {
   const router = useRouter();
-  const { token, user } = useAuthSession();
+  const { token, user, ready } = useAuthSession();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -50,13 +45,13 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => {
-    if (!token) {
+    if (ready && !token) {
       router.replace("/login");
     }
-  }, [router, token]);
+  }, [ready, router, token]);
 
   useEffect(() => {
-    if (!token) {
+    if (!ready || !token) {
       return;
     }
 
@@ -67,10 +62,9 @@ export default function OrdersPage() {
       setError("");
 
       try {
-        const response = await fetch(buildApiUrl("/admin/orders/"), {
+        const response = await apiFetch("/admin/orders/", {
           headers: {
             Accept: "application/json",
-            Authorization: `Bearer ${token}`,
           },
         });
         const data = await readApiResponse(response);
@@ -102,7 +96,7 @@ export default function OrdersPage() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [ready, token]);
 
   const filteredOrders = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -130,7 +124,7 @@ export default function OrdersPage() {
     });
   }, [orders, search, statusFilter]);
 
-  if (!token) {
+  if (!ready || !token) {
     return (
       <main className="min-h-screen bg-[linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-5 py-8">
         <div className="mx-auto max-w-4xl rounded-[28px] border border-white/70 bg-white/80 px-6 py-5 text-sm text-slate-600 shadow-[0_20px_60px_rgba(148,163,184,0.16)]">

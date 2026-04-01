@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 
 export const AUTH_STORAGE_KEYS = {
   access: "access",
@@ -6,32 +6,21 @@ export const AUTH_STORAGE_KEYS = {
   user: "auth_user",
 };
 
-const EMPTY_AUTH_SNAPSHOT = Object.freeze({
-  token: "",
-  user: null,
-});
-
-let cachedSnapshot = EMPTY_AUTH_SNAPSHOT;
-const authListeners = new Set();
-
 export function isBrowser() {
   return typeof window !== "undefined";
 }
 
-export function getAccessToken() {
+function isLocalDevHost() {
   if (!isBrowser()) {
-    return "";
+    return false;
   }
 
-  return window.localStorage.getItem(AUTH_STORAGE_KEYS.access) || "";
-}
-
-export function getRefreshToken() {
-  if (!isBrowser()) {
-    return "";
-  }
-
-  return window.localStorage.getItem(AUTH_STORAGE_KEYS.refresh) || "";
+  const hostname = window.location.hostname;
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname.endsWith(".local")
+  );
 }
 
 export function getStoredUser() {
@@ -51,6 +40,35 @@ export function getStoredUser() {
   }
 }
 
+export function getAccessToken() {
+  if (!isBrowser()) {
+    return "";
+  }
+
+  return window.localStorage.getItem(AUTH_STORAGE_KEYS.access) || "";
+}
+
+export function getRefreshToken() {
+  if (!isBrowser()) {
+    return "";
+  }
+
+  return window.localStorage.getItem(AUTH_STORAGE_KEYS.refresh) || "";
+}
+
+function readAuthSession() {
+  const user = getStoredUser();
+  const access = getAccessToken();
+  const token =
+    access || (!isLocalDevHost() && user ? "cookie-session" : "");
+
+  return {
+    token,
+    user,
+    ready: true,
+  };
+}
+
 export function setAuthSession({ access, refresh, user }) {
   if (!isBrowser()) {
     return;
@@ -62,7 +80,7 @@ export function setAuthSession({ access, refresh, user }) {
     AUTH_STORAGE_KEYS.user,
     JSON.stringify(user || null),
   );
-  emitAuthChange();
+  window.dispatchEvent(new Event("ladyfirst-auth-change"));
 }
 
 export function clearAuthSession() {
@@ -73,53 +91,31 @@ export function clearAuthSession() {
   Object.values(AUTH_STORAGE_KEYS).forEach((key) => {
     window.localStorage.removeItem(key);
   });
-  emitAuthChange();
-}
-
-function subscribe(onStoreChange) {
-  authListeners.add(onStoreChange);
-
-  if (isBrowser()) {
-    window.addEventListener("storage", onStoreChange);
-  }
-
-  return () => {
-    authListeners.delete(onStoreChange);
-
-    if (isBrowser()) {
-      window.removeEventListener("storage", onStoreChange);
-    }
-  };
-}
-
-function getSnapshot() {
-  const nextToken = getAccessToken();
-  const nextUser = getStoredUser();
-
-  if (
-    cachedSnapshot.token === nextToken &&
-    JSON.stringify(cachedSnapshot.user) === JSON.stringify(nextUser)
-  ) {
-    return cachedSnapshot;
-  }
-
-  cachedSnapshot = {
-    token: nextToken,
-    user: nextUser,
-  };
-
-  return cachedSnapshot;
-}
-
-function getServerSnapshot() {
-  return EMPTY_AUTH_SNAPSHOT;
-}
-
-function emitAuthChange() {
-  cachedSnapshot = getSnapshot();
-  authListeners.forEach((listener) => listener());
+  window.dispatchEvent(new Event("ladyfirst-auth-change"));
 }
 
 export function useAuthSession() {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const [session, setSession] = useState({
+    token: "",
+    user: null,
+    ready: false,
+  });
+
+  useEffect(() => {
+    function syncSession() {
+      setSession(readAuthSession());
+    }
+
+    syncSession();
+
+    window.addEventListener("storage", syncSession);
+    window.addEventListener("ladyfirst-auth-change", syncSession);
+
+    return () => {
+      window.removeEventListener("storage", syncSession);
+      window.removeEventListener("ladyfirst-auth-change", syncSession);
+    };
+  }, []);
+
+  return session;
 }
