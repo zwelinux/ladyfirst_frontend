@@ -12,7 +12,8 @@ function isLocalDevHost(hostname) {
   return (
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
-    hostname.endsWith(".local")
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".netlify.app")
   );
 }
 
