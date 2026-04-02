@@ -134,6 +134,14 @@ function SectionHeader({ eyebrow, title, description }) {
   );
 }
 
+function DashboardArrowIcon() {
+  return (
+    <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center self-start rounded-full border border-slate-200 bg-slate-50 text-sm leading-none text-slate-500 transition group-hover:border-slate-950 group-hover:bg-slate-950 group-hover:text-white">
+      ↗
+    </div>
+  );
+}
+
 function UtilityCard({ name, href, summary }) {
   return (
     <Link
@@ -145,9 +153,7 @@ function UtilityCard({ name, href, summary }) {
           <p className="text-lg font-semibold text-slate-950">{name}</p>
           <p className="mt-3 text-sm leading-7 text-slate-600">{summary}</p>
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition group-hover:bg-slate-950 group-hover:text-white">
-          ↗
-        </div>
+        <DashboardArrowIcon />
       </div>
     </Link>
   );
@@ -167,9 +173,7 @@ function AccentCard({ name, href, summary, metric, tone }) {
           <p className="mt-3 text-xl font-semibold text-slate-950">{name}</p>
           <p className="mt-3 text-sm leading-7 text-slate-600">{summary}</p>
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-sm text-white transition group-hover:translate-x-0.5">
-          ↗
-        </div>
+        <DashboardArrowIcon />
       </div>
     </Link>
   );
@@ -292,7 +296,9 @@ export default function Home() {
                 </p>
                 <div className="mt-8 inline-flex items-center gap-2 text-sm font-semibold">
                   <span>{action.cta}</span>
-                  <span className="transition group-hover:translate-x-1">→</span>
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/8 text-base transition group-hover:-translate-y-0.5">
+                    ↗
+                  </span>
                 </div>
               </Link>
             ))}

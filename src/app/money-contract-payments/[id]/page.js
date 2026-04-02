@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuthSession } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
 
@@ -15,12 +15,61 @@ async function readApiResponse(response) {
   }
 }
 
+function getResponseErrorMessage(data, fallback) {
+  if (typeof data === "string") {
+    if (data.trim().startsWith("<!DOCTYPE")) {
+      return "Backend returned HTML instead of JSON. Check the Django route, permission, or server error.";
+    }
+    return data || fallback;
+  }
+
+  if (data?.detail) {
+    return data.detail;
+  }
+
+  if (data?.error) {
+    return data.error;
+  }
+
+  return fallback;
+}
+
 function formatDate(value) {
   if (!value) {
     return "-";
   }
 
   return new Date(value).toLocaleString();
+}
+
+function SessionActionButton({
+  children,
+  tone,
+  disabled,
+  onClick,
+  title,
+}) {
+  const tones = {
+    approve:
+      "border-emerald-300/60 bg-[linear-gradient(135deg,_#10b981_0%,_#059669_100%)] text-white hover:brightness-105",
+    credit:
+      "border-slate-800 bg-[linear-gradient(135deg,_#111827_0%,_#1f2937_100%)] text-white hover:brightness-110",
+    invalid:
+      "border-rose-200 bg-[linear-gradient(180deg,_#fff1f2_0%,_#ffe4e6_100%)] text-rose-700 hover:border-rose-300 hover:bg-rose-50",
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      className={`inline-flex h-14 w-14 items-center justify-center rounded-[20px] border text-xl font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${tones[tone]}`}
+    >
+      {children}
+    </button>
+  );
 }
 
 export default function MoneyContractPaymentDetailPage() {
@@ -30,6 +79,60 @@ export default function MoneyContractPaymentDetailPage() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [actionLoading, setActionLoading] = useState("");
+
+  const loadSession = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await apiFetch(`/admin/money-contract/payments/${params.id}/`);
+      const data = await readApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data === "string" && data.trim().startsWith("<!DOCTYPE")
+            ? "Backend returned HTML instead of JSON for the money contract payment detail. Check the Django server error or admin permission."
+            : "Failed to load money contract payment detail.",
+        );
+      }
+
+      setSession(data);
+    } catch (loadError) {
+      setError(loadError.message || "Unable to load money contract payment detail.");
+    } finally {
+      setLoading(false);
+    }
+  }, [params?.id]);
+
+  async function runAction(action) {
+    setActionLoading(action);
+    setError("");
+
+    try {
+      const response = await apiFetch(
+        `/admin/money-contract/payments/${params.id}/${action}/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+        },
+      );
+      const data = await readApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(getResponseErrorMessage(data, "Unable to update session."));
+      }
+
+      await loadSession();
+    } catch (actionError) {
+      setError(actionError.message || "Unable to update session.");
+    } finally {
+      setActionLoading("");
+    }
+  }
 
   useEffect(() => {
     if (ready && !token) {
@@ -42,44 +145,8 @@ export default function MoneyContractPaymentDetailPage() {
       return;
     }
 
-    let active = true;
-
-    async function loadSession() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const response = await apiFetch(`/admin/money-contract/payments/${params.id}/`);
-        const data = await readApiResponse(response);
-
-        if (!response.ok) {
-          throw new Error(
-            typeof data === "string" && data.trim().startsWith("<!DOCTYPE")
-              ? "Backend returned HTML instead of JSON for the money contract payment detail. Check the Django server error or admin permission."
-              : "Failed to load money contract payment detail.",
-          );
-        }
-
-        if (active) {
-          setSession(data);
-        }
-      } catch (loadError) {
-        if (active) {
-          setError(loadError.message || "Unable to load money contract payment detail.");
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
     loadSession();
-
-    return () => {
-      active = false;
-    };
-  }, [params, ready, token]);
+  }, [loadSession, params, ready, token]);
 
   if (!ready || !token) {
     return (
@@ -205,6 +272,59 @@ export default function MoneyContractPaymentDetailPage() {
                   </div>
                 </div>
               </div>
+
+              {session.status === "paid" ? (
+                <div className="mt-6 rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#fafafa_0%,_#ffffff_100%)] p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">
+                        Decision Panel
+                      </p>
+                      <h3 className="mt-2 text-2xl font-semibold text-slate-950">
+                        Resolve Session
+                      </h3>
+                    </div>
+                    <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Paid
+                    </div>
+                  </div>
+                  <div className="mt-5 grid gap-3 md:grid-cols-3">
+                    <div className="rounded-[22px] border border-emerald-200/70 bg-[linear-gradient(180deg,_#f0fdf4_0%,_#ffffff_100%)] p-4">
+                      <SessionActionButton
+                        tone="approve"
+                        disabled={Boolean(actionLoading)}
+                        onClick={() => runAction("approve")}
+                        title="Approve winner and start money contract"
+                      >
+                        {actionLoading === "approve" ? "…" : "✓"}
+                      </SessionActionButton>
+                      <p className="mt-3 text-sm font-semibold text-slate-950">Approve</p>
+                    </div>
+                    <div className="rounded-[22px] border border-slate-200 bg-[linear-gradient(180deg,_#f8fafc_0%,_#ffffff_100%)] p-4">
+                      <SessionActionButton
+                        tone="credit"
+                        disabled={Boolean(actionLoading)}
+                        onClick={() => runAction("reject-credit")}
+                        title="Reject this session and credit the buyer wallet"
+                      >
+                        {actionLoading === "reject-credit" ? "…" : "⌁"}
+                      </SessionActionButton>
+                      <p className="mt-3 text-sm font-semibold text-slate-950">Credit Wallet</p>
+                    </div>
+                    <div className="rounded-[22px] border border-rose-200 bg-[linear-gradient(180deg,_#fff1f2_0%,_#ffffff_100%)] p-4">
+                      <SessionActionButton
+                        tone="invalid"
+                        disabled={Boolean(actionLoading)}
+                        onClick={() => runAction("reject-invalid")}
+                        title="Reject this session as invalid or fraudulent"
+                      >
+                        {actionLoading === "reject-invalid" ? "…" : "⨯"}
+                      </SessionActionButton>
+                      <p className="mt-3 text-sm font-semibold text-slate-950">Invalid</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </section>
 
             <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">

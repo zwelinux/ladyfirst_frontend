@@ -24,12 +24,63 @@ async function readApiResponse(response) {
   }
 }
 
+function getResponseErrorMessage(data, fallback) {
+  if (typeof data === "string") {
+    if (data.trim().startsWith("<!DOCTYPE")) {
+      return "Backend returned HTML instead of JSON. Check the Django route, permission, or server error.";
+    }
+    return data || fallback;
+  }
+
+  if (data?.detail) {
+    return data.detail;
+  }
+
+  if (data?.error) {
+    return data.error;
+  }
+
+  return fallback;
+}
+
 function formatDate(value) {
   if (!value) {
     return "-";
   }
 
   return new Date(value).toLocaleString();
+}
+
+function SessionActionButton({
+  children,
+  tone,
+  disabled,
+  onClick,
+  title,
+}) {
+  const tones = {
+    neutral:
+      "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
+    approve:
+      "border-emerald-300/60 bg-[linear-gradient(135deg,_#10b981_0%,_#059669_100%)] text-white hover:brightness-105",
+    credit:
+      "border-slate-800 bg-[linear-gradient(135deg,_#111827_0%,_#1f2937_100%)] text-white hover:brightness-110",
+    invalid:
+      "border-rose-200 bg-[linear-gradient(180deg,_#fff1f2_0%,_#ffe4e6_100%)] text-rose-700 hover:border-rose-300 hover:bg-rose-50",
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      className={`inline-flex min-h-11 items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${tones[tone]}`}
+    >
+      {children}
+    </button>
+  );
 }
 
 export default function MoneyContractPaymentsPage() {
@@ -40,6 +91,60 @@ export default function MoneyContractPaymentsPage() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  async function loadSessions() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await apiFetch("/admin/money-contract/payments/");
+      const data = await readApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data === "string" && data.trim().startsWith("<!DOCTYPE")
+            ? "Backend returned HTML instead of JSON for money contract payments. Check the Django server error or admin permission."
+            : "Failed to load money contract payments.",
+        );
+      }
+
+      setSessions(Array.isArray(data) ? data : []);
+    } catch (loadError) {
+      setError(loadError.message || "Unable to load money contract payments.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runAction(sessionId, action) {
+    setActionLoadingId(sessionId);
+    setError("");
+
+    try {
+      const response = await apiFetch(
+        `/admin/money-contract/payments/${sessionId}/${action}/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+        },
+      );
+      const data = await readApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(getResponseErrorMessage(data, "Unable to update session."));
+      }
+
+      await loadSessions();
+    } catch (actionError) {
+      setError(actionError.message || "Unable to update session.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
 
   useEffect(() => {
     if (ready && !token) {
@@ -53,36 +158,6 @@ export default function MoneyContractPaymentsPage() {
     }
 
     let active = true;
-
-    async function loadSessions() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const response = await apiFetch("/admin/money-contract/payments/");
-        const data = await readApiResponse(response);
-
-        if (!response.ok) {
-          throw new Error(
-            typeof data === "string" && data.trim().startsWith("<!DOCTYPE")
-              ? "Backend returned HTML instead of JSON for money contract payments. Check the Django server error or admin permission."
-              : "Failed to load money contract payments.",
-          );
-        }
-
-        if (active) {
-          setSessions(Array.isArray(data) ? data : []);
-        }
-      } catch (loadError) {
-        if (active) {
-          setError(loadError.message || "Unable to load money contract payments.");
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
 
     loadSessions();
 
@@ -247,7 +322,6 @@ export default function MoneyContractPaymentsPage() {
                         Created
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Action
                       </th>
                     </tr>
                   </thead>
@@ -255,12 +329,17 @@ export default function MoneyContractPaymentsPage() {
                     {filteredSessions.map((session) => (
                       <tr key={session.id}>
                         <td className="px-4 py-4">
-                          <div>
-                            <p className="font-medium text-slate-900">#{session.id}</p>
-                            <p className="mt-1 text-sm text-slate-500">
+                          <Link
+                            href={`/money-contract-payments/${session.id}`}
+                            className="group inline-block"
+                          >
+                            <p className="font-medium text-slate-900 transition group-hover:text-orange-600">
+                              #{session.id}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-500 transition group-hover:text-slate-700">
                               {session.ref1 || "No ref1"}
                             </p>
-                          </div>
+                          </Link>
                         </td>
                         <td className="px-4 py-4 text-sm text-slate-700">
                           {session.user_email || `User #${session.user}`}
@@ -283,12 +362,36 @@ export default function MoneyContractPaymentsPage() {
                           {formatDate(session.created_at)}
                         </td>
                         <td className="px-4 py-4">
-                          <Link
-                            href={`/money-contract-payments/${session.id}`}
-                            className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                          >
-                            View Session
-                          </Link>
+                          {session.status === "paid" ? (
+                            <div className="inline-flex rounded-[22px] border border-slate-200 bg-slate-50/80 p-2">
+                              <div className="flex flex-wrap gap-2">
+                                <SessionActionButton
+                                  tone="approve"
+                                  disabled={actionLoadingId === session.id}
+                                  onClick={() => runAction(session.id, "approve")}
+                                  title="Approve winner and start money contract"
+                                >
+                                  {actionLoadingId === session.id ? "…" : "✓"}
+                                </SessionActionButton>
+                                <SessionActionButton
+                                  tone="credit"
+                                  disabled={actionLoadingId === session.id}
+                                  onClick={() => runAction(session.id, "reject-credit")}
+                                  title="Reject this session and credit the buyer wallet"
+                                >
+                                  ⌁
+                                </SessionActionButton>
+                                <SessionActionButton
+                                  tone="invalid"
+                                  disabled={actionLoadingId === session.id}
+                                  onClick={() => runAction(session.id, "reject-invalid")}
+                                  title="Reject this session as invalid or fraudulent"
+                                >
+                                  ⨯
+                                </SessionActionButton>
+                              </div>
+                            </div>
+                          ) : null}
                         </td>
                       </tr>
                     ))}
