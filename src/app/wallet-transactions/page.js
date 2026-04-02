@@ -151,6 +151,9 @@ function WalletTransactionsPageContent() {
                           Type
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Amount
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -168,13 +171,21 @@ function WalletTransactionsPageContent() {
                       {transactions.map((tx) => (
                         <tr key={tx.id}>
                           <td className="px-4 py-4 text-sm font-medium text-slate-900">
-                            {tx.wallet_name} #{tx.wallet_id}
+                            <Link
+                              href={`/wallet-transactions/${tx.id}`}
+                              className="transition hover:text-slate-600"
+                            >
+                              {tx.wallet_name} #{tx.wallet_id}
+                            </Link>
                           </td>
                           <td className="px-4 py-4 text-sm text-slate-700">
                             {tx.wallet_owner_email || "-"}
                           </td>
                           <td className="px-4 py-4 text-sm text-slate-700">
                             {tx.tx_type}
+                          </td>
+                          <td className="px-4 py-4 text-sm text-slate-700">
+                            {tx.status || "-"}
                           </td>
                           <td className="px-4 py-4 text-sm text-slate-700">
                             {tx.sign > 0 ? "+" : "-"}

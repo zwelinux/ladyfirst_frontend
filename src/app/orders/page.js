@@ -12,7 +12,6 @@ const statusOptions = [
   { value: "out_for_delivery", label: "Out For Delivery" },
   { value: "delivered", label: "Delivered" },
   { value: "no_complaints", label: "No Complaints" },
-  { value: "money_ready", label: "Money Ready" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
 ];
@@ -35,6 +34,29 @@ function formatDate(value) {
   return new Date(value).toLocaleString();
 }
 
+function getResponseErrorMessage(data, fallback) {
+  if (typeof data === "string") {
+    if (data.trim().startsWith("<!DOCTYPE")) {
+      return "Backend returned HTML instead of JSON. Check the Django route, permission, or server error.";
+    }
+    return data || fallback;
+  }
+
+  if (data?.detail) {
+    return data.detail;
+  }
+
+  if (data?.error) {
+    return data.error;
+  }
+
+  if (Array.isArray(data?.status) && data.status[0]) {
+    return data.status[0];
+  }
+
+  return fallback;
+}
+
 export default function OrdersPage() {
   const router = useRouter();
   const { token, user, ready } = useAuthSession();
@@ -43,6 +65,67 @@ export default function OrdersPage() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [draftStatuses, setDraftStatuses] = useState({});
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  async function loadOrders() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await apiFetch("/admin/orders/", {
+        headers: {
+          Accept: "application/json",
+        },
+      });
+      const data = await readApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data === "string" && data.trim().startsWith("<!DOCTYPE")
+            ? "Backend returned HTML instead of JSON for orders. Check the Django server error or admin permission."
+            : "Failed to load orders.",
+        );
+      }
+
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (loadError) {
+      setError(loadError.message || "Unable to load orders.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateOrderStatus(orderId) {
+    const nextStatus = draftStatuses[orderId];
+    if (!nextStatus) {
+      return;
+    }
+
+    setActionLoadingId(orderId);
+    setError("");
+
+    try {
+      const response = await apiFetch(`/admin/orders/${orderId}/update-status/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const data = await readApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(getResponseErrorMessage(data, "Unable to update order status."));
+      }
+
+      await loadOrders();
+    } catch (actionError) {
+      setError(actionError.message || "Unable to update order status.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
 
   useEffect(() => {
     if (ready && !token) {
@@ -55,47 +138,7 @@ export default function OrdersPage() {
       return;
     }
 
-    let active = true;
-
-    async function loadOrders() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const response = await apiFetch("/admin/orders/", {
-          headers: {
-            Accept: "application/json",
-          },
-        });
-        const data = await readApiResponse(response);
-
-        if (!response.ok) {
-          throw new Error(
-            typeof data === "string" && data.trim().startsWith("<!DOCTYPE")
-              ? "Backend returned HTML instead of JSON for orders. Check the Django server error or admin permission."
-              : "Failed to load orders.",
-          );
-        }
-
-        if (active) {
-          setOrders(Array.isArray(data) ? data : []);
-        }
-      } catch (loadError) {
-        if (active) {
-          setError(loadError.message || "Unable to load orders.");
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
     loadOrders();
-
-    return () => {
-      active = false;
-    };
   }, [ready, token]);
 
   const filteredOrders = useMemo(() => {
@@ -291,12 +334,42 @@ export default function OrdersPage() {
                           {formatDate(order.created_at)}
                         </td>
                         <td className="px-4 py-4">
-                          <Link
-                            href={`/orders/${order.id}`}
-                            className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                          >
-                            View Order
-                          </Link>
+                          <div className="flex min-w-[220px] flex-col gap-2">
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={draftStatuses[order.id] || order.status}
+                                onChange={(event) =>
+                                  setDraftStatuses((current) => ({
+                                    ...current,
+                                    [order.id]: event.target.value,
+                                  }))
+                                }
+                                className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none"
+                              >
+                                {statusOptions
+                                  .filter((option) => option.value)
+                                  .map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => updateOrderStatus(order.id)}
+                                disabled={actionLoadingId === order.id || (draftStatuses[order.id] || order.status) === order.status}
+                                className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-slate-950 px-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                              >
+                                {actionLoadingId === order.id ? "..." : "Save"}
+                              </button>
+                            </div>
+                            <Link
+                              href={`/orders/${order.id}`}
+                              className="text-sm font-medium text-slate-600 transition hover:text-slate-950"
+                            >
+                              Open detail
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     ))}
